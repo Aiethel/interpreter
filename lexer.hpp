@@ -2,7 +2,7 @@
 #include <map>
 #include <string>
 #include <fstream>
-#include <ctype>
+#include <cctype>
 
 struct Token {
 	enum class Cat {
@@ -16,14 +16,14 @@ struct Token {
 	Token(Cat cat, std::string& text, int line)
 		: m_cat(cat), m_text(text), m_line(line) {
 		//Empty
-	}
-}
+	};
+};
 
 
 struct Lexer {
 	std::map <char, Token::Cat> m_operators = {
 		{'+', Token::Cat::Plus},
-		{'-', Token::Cat::Minux},
+		{'-', Token::Cat::Minus},
 		{'*', Token::Cat::Times},
 		{'/', Token::Cat::Div},
 		{'(', Token::Cat::ParenOpen},
@@ -43,7 +43,7 @@ struct Lexer {
 	char c;
 	int m_line = 1;
 
-	Lexer (std::string& file) : m_input(file) {
+	Lexer (const std::string& file) : m_input(file) {
 		
 	}
 
@@ -57,12 +57,17 @@ struct Lexer {
 		}
 		
 		if (c == '"') {
+			m_buf.pop_back();
 			return stringLiteral();
 		}
 
-		if (std::isDigit(c)) {
+		if (std::isdigit(c)) {
 			return numberLiteral();
 		}
+		if (std::isalpha(c)) {
+			return identifier();
+		}
+		return shift(Token::Cat::Eof);
 	}
 
 
@@ -84,10 +89,11 @@ private:
 
 	Token numberLiteral() {
 		bool error = false;
-		while (!std::isspace(c = m_input.get()) {
-			if (!error && !std::isDigit) {
+		while (!std::isspace(c = m_input.get())) {
+			if (!error && !std::isdigit(c)) {
 				error = true;
 			}
+			m_buf += c;
 		}
 		if (error) {
 			return shift(Token::Cat::Error);
@@ -103,16 +109,16 @@ private:
 	}
 
 	Token shift(Token::Cat c) {
-		Token token(c, m_buffer, m_line);
+		Token token(c, m_buf, m_line);
 		m_buf.clear();
 		return token;
 	}
 	void whitespace() {
-		while (std::isspace ( c = in.get())) {
+		while (std::isspace ( c = m_input.get())) {
 			if (c == '\n') {
 				++m_line;
 			}
 		}
 		m_input.unget();
 	}
-}
+};
