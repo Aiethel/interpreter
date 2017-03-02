@@ -4,6 +4,8 @@
 #include <fstream>
 #include <ctype>
 
+//TODO: ParenClose, ParenOpen whitespaces
+
 struct Token {
 	enum class Cat {
 		ParenOpen, ParenClose, Plus, Minus, Times, Div, Equals, LitString, LitNumber,
@@ -15,6 +17,10 @@ struct Token {
 
 	Token(Cat cat, std::string& text, int line)
 		: m_cat(cat), m_text(text), m_line(line) {
+		//Empty
+	}
+
+	Token() : m_cat(Token::Cat::Eof) m_text(""), m_line(0) {
 		//Empty
 	}
 }
