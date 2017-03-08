@@ -1,11 +1,22 @@
 #include <memory>
 #include <vector>
+#include <iostream>
 
 #include "lexer.hpp"
 #include "ast.hpp"
 
 using TC = Token::Cat;
-namespace pb173{
+
+struct BadParse {
+	Token m_found;
+	std::string m_expected;
+	BadParse(Token t, const std::string& e) : m_found(t), m_expected(e) {}
+};
+
+static inline std::ostream& operator<<(std::ostream& o, BadParse& bp) {
+	return o << "Parse error at " << bp.m_found.m_text << 
+		", at "<< bp.m_found.m_line << ", expected: " << bp.m_expected << std::endl;
+}
 
 struct Parser {
 	Lexer m_lexer;
@@ -24,6 +35,12 @@ struct Parser {
 		m_token = m_lexer.next();
 	}
 	
+	void fail(const std::string& str) {
+		BadParse bp(m_token, str);
+		std::cout << bp << std::endl;
+		throw(bp);
+	}
+
 	Toplevel toplevel() {
 		Toplevel res;
 		while(true) {
@@ -40,7 +57,7 @@ struct Parser {
 
 	Global global() {
 		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+			fail("OpenParen");
 		}
 		shift();
 		if (m_token.m_cat == TC::Let) {
@@ -49,17 +66,16 @@ struct Parser {
 		if (m_token.m_cat == TC::Def) {	
 			return def();	
 		}
-		//error
+		fail("Let or Def");
 	}
 	
 	Let let() {
 		Let l;
 		shift();
 		l.m_identifier = identifier();
-		shift();
 		l.m_body = expression();
-		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+		if (m_token.m_cat != TC::ParenClose) {
+			fail("ParenOpen");
 		}
 		return l;
 	}
@@ -67,37 +83,52 @@ struct Parser {
 	Def def() {
 		Def d;
 		shift();
-		d.m_indentifier = identifier();
-		shift();
+		d.m_identifier = identifier();
 		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+			fail("ParenOpen");
 		}
-		d.m_operands.push_back(expression());
+
 		shift();
-		if (m_token.m_cat != TC::ParenClose) {
-			//error
+		while (m_token.m_cat != TC::ParenClose) {
+			d.m_operands.push_back(expression());
 		}
-		d.m_body = expression();
-		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+
+		shift();
+		while (m_token.m_cat != TC::ParenClose) {
+			d.m_body.push_back(expression());
 		}
+
+        shift();
 		return d;
 	}
 
 	Identifier identifier() {
 		if (m_token.m_cat != TC::Identifier) {
-			//error
+			fail("identifier");
 		}
-		return Identifier(m_token.m_text);
+		auto i = Identifier(m_token.m_text);
+		shift();
+		return i;
 	}
 
+	int litNumber() {
+		auto i = std::stoi(m_token.m_text);
+		shift();
+		return i;
+	}
+
+	std::string litString() {
+		auto i = m_token.m_text;
+		shift();
+		return i;
+	}
 
 	Ptr<Expression> expression() {
 		if (m_token.m_cat == TC::LitString) {
-			return std::make_shared<Expression>(m_token.m_text);
+			return std::make_shared<Expression>(litString());
 		}
-		if (m_token.m_cat == TC::LitString) {
-			return std::make_shared<Expression>(std::stoi(m_token.m_text));
+		if (m_token.m_cat == TC::LitNumber) {
+			return std::make_shared<Expression>(litNumber());
 		}
 		if (m_token.m_cat == TC::Identifier) {
 			return std::make_shared<Expression>(identifier());
@@ -108,10 +139,10 @@ struct Parser {
 				return std::make_shared<Expression>(call());
 			}
 			if (m_token.m_cat == TC::If) {
-				return std::make_shared<Expression>(funcIf());
+				return std::make_shared<Expression>(cycle<If>());
 			}
 			if (m_token.m_cat == TC::While) {
-				return std::make_shared<Expression>(funcWhile());
+				return std::make_shared<Expression>(cycle<While>());
 			}
 			if (m_token.m_cat == TC::Let) {
 				return std::make_shared<Expression>(let());
@@ -122,69 +153,61 @@ struct Parser {
 				}
 			}
 		}
-		
+		fail("Unknown expression");
 	}
 
 	Call call() {
 		Call c;
-		c.m_identifier = m_token.m_text;
+		c.m_identifier = Identifier(m_token.m_text);
 		shift();
-		while (m_token.m_cat == TC::Identifier || m_token.m_cat == TC::LitString 
-			|| m_token.m_cat == TC::LitNumber) {
-				if (m_token.m_cat == TC::ParenClose) {
-					return c;
-				}
-				c.m_operands.push_back(expression());
-				shift();
-			}
-		//error
+		while (m_token.m_cat != TC::ParenClose) {
+			c.m_operands.push_back(expression());
+		}
+		shift();
+		return c;
 	}
 	
 	App app() {
 		App a;
 		a.m_operator = m_token.m_text[0];
 		shift();
-		if (m_token.m_cat == TC::Identifier || m_token.m_cat == TC::LitString 
-			|| m_token.m_cat == TC::LitNumber) {
+		while(m_token.m_cat != TC::ParenClose) {
 			a.m_operands.push_back(expression());
 		}
+
 		shift();
-		if (m_token.m_cat == TC::ParenOpen) {
-			shift();
-			for (auto& o : m_lexer.m_operators) {
-				if (m_token.m_text[0] == o.first) {
-					a.m_operands.emplace_back
-						(std::make_shared<Expression>(app()));
-				}
-			}
-			
-		}
-		shift();
-		if (m_token.m_cat == TC::Identifier || m_token.m_cat == TC::LitString 
-			|| m_token.m_cat == TC::LitNumber) {
-			a.m_operands.push_back(expression());
-		}
-		shift();
-		if (m_token.m_cat != TC::ParenClose) {
-			//error
-		}
 		return a;
 	}
-	
+
+
+	template<typename T>
+	T cycle() {
+		T i;
+		shift();
+		if (m_token.m_cat != TC::ParenOpen) {
+			fail("ParenOpen");
+		}
+		i.m_condition = expression();
+
+		while (m_token.m_cat == TC::ParenOpen) {
+			i.m_body.push_back(expression());
+		}
+		shift();
+		return i;
+	}
+
 	If funcIf() {
 		If i;
 		shift();
 		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+			fail("ParenOpen");
 		}
-		shift();
 		i.m_condition = expression();
-		shift();
-		i.m_body = expression();
-		shift();
-		if (m_token.m_cat != TC::ParenClose) {
-			//error
+
+		while (m_token.m_cat == TC::ParenOpen) {
+			i.m_body.push_back(expression());
 		}
+		shift();
 		return i;
 	}
 
@@ -192,18 +215,16 @@ struct Parser {
 		While i;
 		shift();
 		if (m_token.m_cat != TC::ParenOpen) {
-			//error
+			fail("ParenOpen");
 		}
 		shift();
 		i.m_condition = expression();
 		shift();
-		i.m_body = expression();
+		//i.m_body = expression();
 		shift();
 		if (m_token.m_cat != TC::ParenClose) {
-			//error
+			fail("ParenClose");
 		}
 		return i;
 	}
 };
-
-}
