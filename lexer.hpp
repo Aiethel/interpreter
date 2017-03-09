@@ -9,7 +9,7 @@
 struct Token {
 	enum class Cat {
 		ParenOpen, ParenClose, Plus, Minus, Times, Div, Equals, LitString, LitNumber,
-		Identifier, If, Else, Endif, While, Error, Eof
+		Identifier, If, Else, Endif, While, Error, Eof, Def, Let
 	} m_cat;
 
 	std::string m_text;
@@ -20,7 +20,7 @@ struct Token {
 		//Empty
 	}
 
-	Token() : m_cat(Token::Cat::Eof) m_text(""), m_line(0) {
+	Token() : m_cat(Token::Cat::Eof), m_text(""), m_line(0) {
 		//Empty
 	}
 };
@@ -42,6 +42,8 @@ struct Lexer {
 		{"else", Token::Cat::Else},
 		{"endif", Token::Cat::Endif},
 		{"while", Token::Cat::While},
+		{"def", Token::Cat::Def},
+		{"let", Token::Cat::Let},
 	};
 
 	std::ifstream m_input;
@@ -89,18 +91,19 @@ private:
 				}
 			}
 		}
-		return shift(Token::Cat::Identifier);
 		m_input.unget();
+		return shift(Token::Cat::Identifier);
 	}
 
 	Token numberLiteral() {
 		bool error = false;
-		while (!std::isspace(c = m_input.get())) {
+		while (std::isalnum(c = m_input.get())) {
 			if (!error && !std::isdigit(c)) {
 				error = true;
 			}
 			m_buf += c;
 		}
+		m_input.unget();
 		if (error) {
 			return shift(Token::Cat::Error);
 		}
