@@ -1,7 +1,7 @@
 #include <memory>
 #include <vector>
 #include "bricks/brick-types"
-#include "scope"
+#include "scope.hpp"
 
 using brick::types::Union;
 
@@ -72,20 +72,104 @@ struct Toplevel
 	std::vector<Global> m_globals;
 
 	Scope m_scope;
+};
 
-	void buildScope(Symtable& sm) {
-		for (auto& g : m_globals) {
-			g.match() (
-				[&] (Def d) {
-					sm.add(m_identifier);
-					m_scope.add(symbolTable.get(m_identifier));
-					d.buildScope();
-				 }, 
-				[&] (Let l) { }
-			)
+
+
+
+namespace {
+	void buildScope(SymbolTable& sm, Expression e, Scope* scope);
+
+
+	void buildScope(SymbolTable& sm, IfLike i, Scope* scope) {
+        buildScope(sm, Expression(*i.m_condition), scope);
+        i.m_scope.setparent(scope);
+		for (auto& a: i.m_body) {
+			buildScope(sm, Expression(*a), &i.m_scope);
+		}
+        scope->save(i.m_scope);
+	}
+
+	void buildScope(SymbolTable &sm, Let l, Scope* scope) {
+		sm.add(l.m_identifier.m_name);
+        scope->define(sm.get(l.m_identifier.m_name));
+		buildScope(sm, Expression(*l.m_body), scope);
+	}
+
+	void buildScope(SymbolTable& sm, Def d, Scope* scope) {
+		sm.add(d.m_identifier.m_name);
+
+        scope->define(sm.get(d.m_identifier.m_name));
+        d.m_scope.setparent(scope);
+
+		for (auto a: d.m_operands) {
+            a->match([&](Identifier i) {
+                sm.add(i.m_name);
+                d.m_scope.define(sm.get(i.m_name));
+            });
+			buildScope(sm, Expression(*a), &d.m_scope);
+		}
+
+		for (auto& a: d.m_body) {
+			buildScope(sm, Expression(*a), &d.m_scope);
+		}
+
+        scope->save(d.m_scope);
+	}
+
+	void buildScope(SymbolTable& sm, Call c, Scope* scope) {
+		sm.add(c.m_identifier.m_name);
+        scope->check(sm.get(c.m_identifier.m_name));
+		for (auto& a: c.m_operands) {
+			buildScope(sm, Expression(*a), scope);
 		}
 	}
-};
+
+
+	void buildScope( SymbolTable& sm, App a, Scope* scope) {
+		for (auto& b: a.m_operands) {
+			buildScope(sm, Expression(*b), scope);
+		}
+	}
+
+	void buildScope(SymbolTable& sm, Toplevel& tl) {
+        for (auto& g : tl.m_globals) {
+			g.match(
+					[&] (Def d) {
+						buildScope(sm, d, &tl.m_scope);
+					},
+					[&] (Let l) {
+						buildScope(sm, l, &tl.m_scope);
+					}
+			);
+		}
+	}
+
+	void buildScope(SymbolTable& sm, Expression e, Scope* scope)
+	{
+		e.match( [&]( If v ) {
+					 buildScope(sm, IfLike(v), scope);
+				 },
+				 [&]( Call v ) {
+					 buildScope(sm, Call(v), scope);
+				 },
+				 [&]( App v ) {
+					 buildScope(sm, App(v), scope);
+				 },
+				 [&]( While v ) {
+					 buildScope(sm, IfLike(v), scope);;
+				 },
+				 [&]( Identifier i) {
+					 sm.add(Identifier(i).m_name);
+                     scope->check(sm.get(Identifier(i).m_name));
+				 },
+				 [&]( Let v ) {
+					 buildScope(sm, Let(v), scope );
+				 }
+		);
+	}
+
+}
 
 
 

@@ -43,8 +43,8 @@ struct Parser {
 
 	Toplevel toplevel() {
 		Toplevel res;
+        shift();
 		while(true) {
-			shift();
 			if (m_token.m_cat == TC::Eof) {
 				return res;
 			}
@@ -75,8 +75,9 @@ struct Parser {
 		l.m_identifier = identifier();
 		l.m_body = expression();
 		if (m_token.m_cat != TC::ParenClose) {
-			fail("ParenOpen");
+			fail("ParenClose");
 		}
+        shift();
 		return l;
 	}
 

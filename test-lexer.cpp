@@ -1,7 +1,7 @@
 #define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
-#include "parser.hpp"
+#include "interpreter.hpp"
 
 using TC = Token::Cat;
 
@@ -163,4 +163,11 @@ TEST_CASE("Parser") {
 	auto a = parser.toplevel();
 	std::cout << "Code" << std::endl;
 	std::cout << a << std::endl;
+}
+
+TEST_CASE("SymbolTable") {
+    Interpreter interpreter("test/data.txt");
+    std::cout << interpreter.toplevel;
+    std::cout << interpreter.symTable;
+    std::cout << "****" << std::endl << interpreter.toplevel.m_scope << std::endl;
 }

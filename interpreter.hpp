@@ -1,11 +1,22 @@
-#include "ast.hpp"
-#include "scope.hpp"
+#include "parser.hpp"
+
+struct SymbolTable;
+struct TopLevel;
 
 struct Interpreter {
 	SymbolTable symTable;
 	Toplevel toplevel;
 
-	Interpreter(Toplevel tl) : toplevel(tl) {
-		//Empty
+
+	Interpreter(const char* c)  {
+		Parser parser(c);
+		toplevel = parser.toplevel();
+        buildScope(symTable, toplevel);
 	}
-}
+
+	void buildSymbolTable() {
+		buildScope(symTable, toplevel);
+	}
+
+};
+
