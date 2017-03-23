@@ -13,10 +13,5 @@ struct Interpreter {
 		toplevel = parser.toplevel();
         buildScope(symTable, toplevel);
 	}
-
-	void buildSymbolTable() {
-		buildScope(symTable, toplevel);
-	}
-
 };
 

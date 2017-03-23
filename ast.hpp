@@ -125,6 +125,11 @@ namespace {
 		}
 	}
 
+    void buildScope( SymbolTable& sm, Identifier i, Scope* scope) {
+        sm.add(Identifier(i).m_name);
+        scope->check(sm.get(Identifier(i).m_name));
+    }
+
 
 	void buildScope( SymbolTable& sm, App a, Scope* scope) {
 		for (auto& b: a.m_operands) {
@@ -157,11 +162,10 @@ namespace {
 					 buildScope(sm, App(v), scope);
 				 },
 				 [&]( While v ) {
-					 buildScope(sm, IfLike(v), scope);;
+					 buildScope(sm, IfLike(v), scope);
 				 },
 				 [&]( Identifier i) {
-					 sm.add(Identifier(i).m_name);
-                     scope->check(sm.get(Identifier(i).m_name));
+                     buildScope(sm, Identifier(i), scope);
 				 },
 				 [&]( Let v ) {
 					 buildScope(sm, Let(v), scope );

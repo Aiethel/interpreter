@@ -9,7 +9,7 @@
 struct Token {
 	enum class Cat {
 		ParenOpen, ParenClose, Plus, Minus, Times, Div, Equals, LitString, LitNumber,
-		Identifier, If, Else, Endif, While, Error, Eof, Def, Let
+		Identifier, If, Else, Endif, While, Error, Eof, Def, Let, Not, Assign
 	} m_cat;
 
 	std::string m_text;
@@ -35,6 +35,8 @@ struct Lexer {
 		{'(', Token::Cat::ParenOpen},
 		{')', Token::Cat::ParenClose},
 		{'=', Token::Cat::Equals},
+		{'!', Token::Cat::Not},
+		{'~', Token::Cat::Assign},
 	};
 	
 	std::map <std::string, Token::Cat> m_keywords = {

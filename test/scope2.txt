@@ -1,0 +1,11 @@
+(def func (a)
+    (+ a 5)
+)
+
+(def foo (b)
+    (func b)
+)
+
+(def func (c)
+    (foo (c))
+)

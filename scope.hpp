@@ -1,7 +1,18 @@
 #include <map>
 #include <string>
 #include <set>
+#include <iostream>
 #include <memory>
+#include <vector>
+
+struct ScopeError {
+    std::string text;
+    ScopeError(const std::string& str) : text(str) {}
+};
+
+static inline std::ostream& operator<<(std::ostream& o, ScopeError& se) {
+    return o << "Scope Error: " << se.text << std::endl;
+}
 
 struct SymbolTable {
 	std::map<std::string, int> m_data;
@@ -28,7 +39,7 @@ std::ostream& operator<<(std::ostream& o, const SymbolTable& sm) {
 }
 
 struct Scope {
-	Scope* m_parent;
+	Scope* m_parent = nullptr;
 	std::set<int> m_identifiers;
     std::vector<Scope> m_children;
 
@@ -47,13 +58,12 @@ struct Scope {
             }
             hndl = hndl->m_parent;
         }
-        std::cerr << "THROWING NOT IN SCOPE: " << n << std::endl;
-        throw("Using variable not in scope");
+        throw (ScopeError("Variable not define yet used " + std::to_string(n)));
     }
 
 	void define(int n) {
 		if (m_identifiers.find(n) != m_identifiers.end()) {
-			throw("Duplicate identifier");
+            throw (ScopeError("Variable already defined in scope " + std::to_string(n)));
 		}
 		m_identifiers.insert(n);
 	}
@@ -71,10 +81,6 @@ std::ostream& operator<<(std::ostream& o, const Scope& scope) {
     o << "In scope ";
     for (auto& a: scope.m_identifiers) {
         o << a << " ";
-    }
-    o << std::endl;
-    for (auto& a : scope.m_children) {
-        o << a;
     }
     return o;
 }
