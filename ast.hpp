@@ -80,12 +80,45 @@ struct Toplevel
 namespace {
 	void buildScope(SymbolTable& sm, Expression e, Scope* scope);
 
+	void buildSymTable(SymbolTable& sm, Expression e) {
+		e.match( [&]( If v ) {
+				buildSymTable(sm, *v.m_condition);
+				for (auto& a: v.m_body) {
+					buildSymTable(sm, *a);
+				}
+			},
+			[&]( Call v ) {
+				sm.add(v.m_identifier.m_name);
+				for (auto& a: v.m_operands) {
+						buildSymTable(sm, *a);
+				}
+			},
+			[&]( App v ) {
+				for (auto& b: v.m_operands) {
+					buildSymTable(sm, *b);
+				}
+			},
+			[&]( While v ) {
+				buildSymTable(sm, *v.m_condition);
+				for (auto& a: v.m_body) {
+					buildSymTable(sm, *a);
+				}
+			},
+			[&]( Identifier i) {
+                          	sm.add(i.m_name);
+			},
+			[&]( Let v ) {
+				buildSymTable(sm, v);
+			}
+		);
+
+	}
 
 	void buildScope(SymbolTable& sm, IfLike i, Scope* scope) {
-        buildScope(sm, Expression(*i.m_condition), scope);
+        buildScope(sm, *i.m_condition, scope);
         i.m_scope.setparent(scope);
 		for (auto& a: i.m_body) {
-			buildScope(sm, Expression(*a), &i.m_scope);
+			buildScope(sm, *a, &i.m_scope);
 		}
         scope->save(i.m_scope);
 	}
@@ -93,7 +126,7 @@ namespace {
 	void buildScope(SymbolTable &sm, Let l, Scope* scope) {
 		sm.add(l.m_identifier.m_name);
         scope->define(sm.get(l.m_identifier.m_name));
-		buildScope(sm, Expression(*l.m_body), scope);
+		buildScope(sm, *l.m_body, scope);
 	}
 
 	void buildScope(SymbolTable& sm, Def d, Scope* scope) {
@@ -107,45 +140,29 @@ namespace {
                 sm.add(i.m_name);
                 d.m_scope.define(sm.get(i.m_name));
             });
-			buildScope(sm, Expression(*a), &d.m_scope);
+			buildScope(sm, *a, &d.m_scope);
 		}
 
 		for (auto& a: d.m_body) {
-			buildScope(sm, Expression(*a), &d.m_scope);
+			buildScope(sm, *a, &d.m_scope);
 		}
 
         scope->save(d.m_scope);
 	}
 
-	void buildScope(SymbolTable& sm, Call c, Scope* scope) {
-		sm.add(c.m_identifier.m_name);
-        scope->check(sm.get(c.m_identifier.m_name));
-		for (auto& a: c.m_operands) {
-			buildScope(sm, Expression(*a), scope);
-		}
-	}
-
-    void buildScope( SymbolTable& sm, Identifier i, Scope* scope) {
-        sm.add(Identifier(i).m_name);
-        scope->check(sm.get(Identifier(i).m_name));
-    }
-
-
-	void buildScope( SymbolTable& sm, App a, Scope* scope) {
-		for (auto& b: a.m_operands) {
-			buildScope(sm, Expression(*b), scope);
-		}
-	}
-
 	void buildScope(SymbolTable& sm, Toplevel& tl) {
         for (auto& g : tl.m_globals) {
+		g.match(
+			[&](Def d) {buildSymTable(sm, d);},
+			[&](Let l) {buildSymTable(sm, l);}
+		);
+	}
+	
+
+	for (auto& g : tl.m_globals) {
 			g.match(
-					[&] (Def d) {
-						buildScope(sm, d, &tl.m_scope);
-					},
-					[&] (Let l) {
-						buildScope(sm, l, &tl.m_scope);
-					}
+				[&] (Def d) {buildScope(sm, d, &tl.m_scope);},
+				[&] (Let l) {buildScope(sm, l, &tl.m_scope);}
 			);
 		}
 	}
@@ -153,22 +170,29 @@ namespace {
 	void buildScope(SymbolTable& sm, Expression e, Scope* scope)
 	{
 		e.match( [&]( If v ) {
-					 buildScope(sm, IfLike(v), scope);
+					 buildScope(sm, v, scope);
 				 },
 				 [&]( Call v ) {
-					 buildScope(sm, Call(v), scope);
+					sm.add(v.m_identifier.m_name);
+				        scope->check(sm.get(v.m_identifier.m_name));
+					for (auto& a: v.m_operands) {
+						buildScope(sm, *a, scope);
+					}
 				 },
 				 [&]( App v ) {
-					 buildScope(sm, App(v), scope);
+					for (auto& b: v.m_operands) {
+						buildScope(sm, *b, scope);
+					}
 				 },
 				 [&]( While v ) {
-					 buildScope(sm, IfLike(v), scope);
+					 buildScope(sm, v, scope);
 				 },
 				 [&]( Identifier i) {
-                     buildScope(sm, Identifier(i), scope);
+                          		sm.add(i.m_name);
+        				scope->check(sm.get(i.m_name));
 				 },
 				 [&]( Let v ) {
-					 buildScope(sm, Let(v), scope );
+					 buildScope(sm, v, scope );
 				 }
 		);
 	}
@@ -186,24 +210,24 @@ std::ostream &operator<<( std::ostream &o, Identifier i) {
 }
 
 std::ostream &operator<<( std::ostream &o, IfLike i) {
-    o << Expression(*i.m_condition);
+    o << *i.m_condition;
     for (auto& a: i.m_body) {
-        o << Expression(*a);
+        o << *a;
     }
     return o;
 }
 
 std::ostream &operator<<( std::ostream &o, Let l) {
-    return o << l.m_identifier << Expression(*l.m_body);
+    return o << l.m_identifier << *l.m_body;
 }
 
 std::ostream &operator<<( std::ostream &o, Def d) {
     o << d.m_identifier;
     for (auto& a: d.m_operands) {
-        o << Expression(*a);
+        o << *a;
     }
     for (auto& a: d.m_body) {
-        o << Expression(*a);
+        o << *a;
     }
     return o;
 }
@@ -211,7 +235,7 @@ std::ostream &operator<<( std::ostream &o, Def d) {
 std::ostream &operator<<( std::ostream &o, Call c) {
     o << c.m_identifier;
     for (auto& a: c.m_operands) {
-        o << Expression(*a);
+        o << *a;
     }
     return o;
 }
@@ -226,7 +250,7 @@ std::ostream &operator<<( std::ostream &o, Global g ) {
 std::ostream &operator<<( std::ostream &o, App a ) {
     o << a.m_operator;
     for (auto& b: a.m_operands) {
-        o << Expression(*b);
+        o << *b;
     }
     return o;
 }
@@ -234,8 +258,8 @@ std::ostream &operator<<( std::ostream &o, App a ) {
 std::ostream& operator<< ( std::ostream &o, Expression e )
 {
     e.match( [&]( If v ) { o << "if?" << IfLike(v); },
-             [&]( Call v ) { o << "("  << Call( v ) << ")"; },
-             [&]( App v ) { o << "(" << App( v ) << ")"; },
+             [&]( Call v ) { o << "("  << v << ")"; },
+             [&]( App v ) { o << "(" << v << ")"; },
              [&]( While v ) { o << "(while" << IfLike( v ) << ")"; },
              [&]( Identifier i ) { o << i; },
              [&]( Constant c )
@@ -243,7 +267,7 @@ std::ostream& operator<< ( std::ostream &o, Expression e )
                  c.match( [&]( int i ) { o << i; },
                           [&]( std::string s ) { o << '"' << s << '"'; } );
              },
-             [&]( Let v ) { o << "let?" << Let(v); } );
+             [&]( Let v ) { o << "let?" << v; } );
     return o;
 }
 
