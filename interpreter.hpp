@@ -21,7 +21,6 @@ struct Interpreter {
 
 	int run() {
 		auto x = eval(symTable, toplevel);
-        std::cout << "Finish" << std::endl;
         int res = 0;
         x.match(
                 [&](int i) {res = i;}

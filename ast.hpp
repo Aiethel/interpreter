@@ -323,16 +323,28 @@ namespace {
         return os;
     }
 
-    Value eval(SymbolTable& sm, Expression e, std::unordered_map<int, Value>& vals);
+    Value eval(SymbolTable& sm, Expression e, ValMap& vals);
+
+    Value eval(SymbolTable& sm, While i, ValMap& vals) {
+        auto x = eval(sm, *i.m_condition, vals);
+        while( x != 0) {
+            for (auto& a: i.m_body) {
+                eval(sm, *a, vals);
+            }
+            x = eval(sm, *i.m_condition, vals);
+        }
+        return x;
+    }
 
     //Evaluates inside of IfLike only if condition is met
-    Value eval(SymbolTable& sm, IfLike i, ValMap& vals) {
+    Value eval(SymbolTable& sm, If i, ValMap& vals) {
         auto x = eval(sm, *i.m_condition, vals);
         if( x != 0) {
             for (auto& a: i.m_body) {
                 eval(sm, *a, vals);
             }
         }
+        return x;
     }
 
     //Sets new variable in ValMap
@@ -340,9 +352,9 @@ namespace {
         Value x = eval(sm, *l.m_body, vals);
         auto iter = vals.find(sm.get(l.m_identifier.m_name));
         if (iter == vals.end()) {
-            vals.insert({sm.get(l.m_identifier.m_name), x});
+            vals.insert({sm.get(l.m_identifier.m_name), std::make_shared<Value>(x)});
         } else {
-            iter->second = x;
+            *iter->second = x;
         }
         x.match(
                 [&](int i) {std::cout <<"let" << i << std::endl;}
@@ -369,7 +381,13 @@ namespace {
         for (int i = 0; i < c.m_operands.size(); ++i) {
             next->m_operands[i]->match(
                     [&](Identifier n) {
-                        newVal.insert({sm.get(n.m_name), eval(sm, *c.m_operands[i], vals)});
+                        auto h = *c.m_operands[i];
+                        h.match(
+                                [&](Identifier q) {newVal.insert({sm.get(n.m_name),
+                                                                  SptrVal(vals.find(sm.get(q.m_name))->second)});
+                                                                 }
+                        );
+                        newVal.insert({sm.get(n.m_name), std::make_shared<Value>(eval(sm, *c.m_operands[i], vals))});
                     }
             );
         }
@@ -387,8 +405,7 @@ namespace {
                     [&](Identifier i) {
                         auto hndl = vals.find(sm.get(i.m_name));
                         x = eval(sm, *a.m_operands[1], vals);
-                        std::cerr << x;
-                        hndl->second = x;
+                        *hndl->second = x;
                     }
             );
         }
@@ -418,10 +435,14 @@ namespace {
         if (o == '=') {
             if (rhs == lhs) {
                 return 1;
+            } else {
+                return 0;
             }
         } else if (o == '!') {
             if (rhs == lhs) {
                 return 0;
+            } else {
+                return 1;
             }
         }
         return x;
@@ -445,24 +466,14 @@ namespace {
                      x = eval(sm, v, vals);
                  },
                  [&]( Identifier i) {
-                     x = vals.find(sm.get(i.m_name))->second;
-                     std::cout << i.m_name;
+                     x = *vals.find(sm.get(i.m_name))->second;
                  },
                  [&]( Let v ) {
                      x = eval(sm, v, vals);
                  },
                  [&] (Constant c) {
                      x = c;
-                     std::cout << "c ";
                  }
-        );
-        x.match(
-                [&](int i) {
-                    std::cout << "int exp: "<< i << std::endl;
-                },
-                [&](std::string i) {
-                    std::cout << "str exp: "<< i << std::endl;
-                }
         );
         return x;
     }
@@ -470,8 +481,6 @@ namespace {
 
     Value eval(SymbolTable& sm, Toplevel& tl) {
         Def* a = sm.func_ptrs.find(sm.get("main"))->second.get();
-        std::cout << "Yolo" << std::endl;
-        std::cerr << a->m_identifier << std::endl;
         ValMap vals;
         for (auto b : a->m_operands) {
             int index = 0;
@@ -480,7 +489,7 @@ namespace {
             );
             vals.insert({index, std::make_shared<Value>()});
         }
-        std::cerr << "Res" << eval(sm, Def(*a), vals);
+        eval(sm, Def(*a), vals);
         return *vals.find(sm.get("a"))->second.get();
     }
 

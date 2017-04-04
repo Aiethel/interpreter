@@ -39,11 +39,17 @@ struct SymbolTable {
 	}
 };
 
+
 std::ostream& operator<<(std::ostream& o, const SymbolTable& sm) {
 	for (auto a: sm.m_data) {
 		o << a.first << ": " << a.second << std::endl;
 	}
 	return o << std::endl;
+}
+
+void fail(ScopeError err) {
+    std::cerr << err;
+    throw err;
 }
 
 struct Scope {
@@ -66,12 +72,12 @@ struct Scope {
             }
             hndl = hndl->m_parent;
         }
-        throw (ScopeError("Variable not define yet used " + std::to_string(n)));
+        fail (ScopeError("Variable not define yet used " + std::to_string(n)));
     }
 
 	void define(int n) {
 		if (m_identifiers.find(n) != m_identifiers.end()) {
-            throw (ScopeError("Variable already defined in scope " + std::to_string(n)));
+            fail (ScopeError("Variable already defined in scope " + std::to_string(n)));
 		}
 		m_identifiers.insert(n);
 	}

@@ -1,0 +1,13 @@
+(def fact (number result)
+    (while (! number 0)
+        (~ result (* result number))
+        (~ number (- number 1))
+    )
+)
+
+(def main (a)
+    (~ a 0)
+    (let q 1)
+    (fact 5 q)
+    (~ a q)
+)

@@ -151,12 +151,13 @@ TEST_CASE("Program") {
 }
 #endif
 
+
 TEST_CASE("Scoping") {
     CHECK_THROWS_AS(Interpreter("test/scope.txt"), ScopeError);
     try {
         Interpreter("test/scope.txt");
     } catch (ScopeError& err) {
-        CHECK(err.text == "Variable not define yet used 5");
+        CHECK(err.text == "Variable not define yet used 6");
     }
 }
 
@@ -165,7 +166,7 @@ TEST_CASE("Redefine") {
     try {
         Interpreter("test/scope1.txt");
     } catch (ScopeError& err) {
-        CHECK(err.text == "Variable already defined in scope 5");
+        CHECK(err.text == "Variable already defined in scope 6");
     }
 }
 
@@ -174,7 +175,7 @@ TEST_CASE("Function Names") {
     try {
         Interpreter("test/scope2.txt");
     } catch (ScopeError& err) {
-        CHECK(err.text == "Variable already defined in scope 0");
+        CHECK(err.text == "Variable already defined in scope 1");
     }
 }
 
@@ -184,8 +185,8 @@ TEST_CASE("SymbolTable") {
     auto& scope = interpreter.toplevel.m_scope;
     auto& st = interpreter.symTable;
 
-    CHECK(scope.m_children.size() == 2);
-    CHECK(scope.m_identifiers.size() == 3);
+    CHECK(scope.m_children.size() == 3);
+    CHECK(scope.m_identifiers.size() == 5);
     CHECK(scope.m_identifiers.find(st.get("foo")) != scope.m_identifiers.end());
     CHECK(scope.m_identifiers.find(st.get("func")) != scope.m_identifiers.end());
     CHECK(scope.m_identifiers.find(st.get("a")) != scope.m_identifiers.end());
@@ -212,9 +213,40 @@ TEST_CASE("SymbolTable") {
     CHECK(curr.m_identifiers.find(st.get("ff")) != curr.m_identifiers.end());
 }
 
+
 TEST_CASE("Output") {
     Interpreter interpreter("test/data.txt");
-    std::cout << interpreter.toplevel;
-    std::cout << interpreter.symTable;
-    std::cout << "****" << std::endl << interpreter.toplevel.m_scope << std::endl;
+    //std::cout << interpreter.toplevel;
+    //std::cout << interpreter.symTable;
+    //std::cout << "****" << std::endl << interpreter.toplevel.m_scope << std::endl;
 }
+
+
+TEST_CASE("Factorial") {
+    Interpreter interpreter("test/fact.txt");
+    //std::cout << interpreter.toplevel;
+    //std::cout << interpreter.symTable;
+    CHECK(interpreter.symTable.func_ptrs.size() == 2);
+    int a = interpreter.run();
+    CHECK(a == 5);
+}
+
+
+
+TEST_CASE("Something that really counts factorial") {
+        Interpreter interpreter("test/RealFact.txt");
+        //std::cout << "RealFact.txt" << std::endl;
+        //std::cout << interpreter.toplevel;
+        //std::cout << interpreter.symTable;
+        int a = interpreter.run();
+        CHECK(a == 120);
+}
+
+
+
+TEST_CASE("Some other program") {
+    Interpreter interpreter("test/SomeOtherRec.txt");
+    int a = interpreter.run();
+    CHECK(a == 100);
+}
+
