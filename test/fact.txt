@@ -1,0 +1,10 @@
+(def inc(e)
+    (~ e (+ e 1))
+)
+
+(def main(a)
+    (let b 4)
+    (let q (inc b))
+    (let r 20)
+    (~ a b)
+)

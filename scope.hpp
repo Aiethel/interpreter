@@ -1,9 +1,15 @@
+#pragma once
+
 #include <map>
 #include <string>
 #include <set>
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <stack>
+
+struct Def;
+struct Expression;
 
 struct ScopeError {
     std::string text;
@@ -15,7 +21,9 @@ static inline std::ostream& operator<<(std::ostream& o, ScopeError& se) {
 }
 
 struct SymbolTable {
-	std::map<std::string, int> m_data;
+	std::map<std::string, int> m_data = {{"return" , 0}};
+    std::map<int, std::shared_ptr<Def>> func_ptrs;
+    std::stack<Expression*> call_stack;
 
 	void add(const std::string& str) {
 		m_data.insert(std::make_pair(str, m_data.size()));

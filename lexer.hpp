@@ -1,10 +1,11 @@
+#pragma once
+
 #include <iostream>
 #include <map>
 #include <string>
 #include <fstream>
 #include <cctype>
 
-//TODO: ParenClose, ParenOpen whitespaces
 
 struct Token {
 	enum class Cat {

@@ -1,5 +1,9 @@
+#pragma once
+
 #include <memory>
 #include <vector>
+#include <unordered_map>
+#include <stack>
 #include "bricks/brick-types"
 #include "scope.hpp"
 
@@ -64,7 +68,6 @@ using Global = Union<Def, Let>;
 using ExpBase = Union <Let, Def, If, While, App, Call, Identifier, Constant>;
 struct Expression : ExpBase {
 	explicit Expression(ExpBase b) : ExpBase(b) {}
-
 };
 
 struct Toplevel
@@ -75,109 +78,112 @@ struct Toplevel
 };
 
 
-
-
 namespace {
 	void buildScope(SymbolTable& sm, Expression e, Scope* scope);
 
-	void buildSymTable(SymbolTable& sm, Expression e) {
-		e.match( [&]( If v ) {
-				buildSymTable(sm, *v.m_condition);
-				for (auto& a: v.m_body) {
-					buildSymTable(sm, *a);
-				}
-			},
-			[&]( Call v ) {
-				sm.add(v.m_identifier.m_name);
-				for (auto& a: v.m_operands) {
-						buildSymTable(sm, *a);
-				}
-			},
-			[&]( App v ) {
-				for (auto& b: v.m_operands) {
-					buildSymTable(sm, *b);
-				}
-			},
-			[&]( While v ) {
-				buildSymTable(sm, *v.m_condition);
-				for (auto& a: v.m_body) {
-					buildSymTable(sm, *a);
-				}
-			},
-			[&]( Identifier i) {
-                          	sm.add(i.m_name);
-			},
-			[&]( Let v ) {
-				buildSymTable(sm, v);
-			}
-		);
+	void buildSymTable(SymbolTable& sm, Expression e);
 
-	}
+    void buildSymTable(SymbolTable& sm, IfLike i) {
+        for (auto& a: i.m_body) {
+            buildSymTable(sm, *a);
+        }
+    }
 
-	void buildScope(SymbolTable& sm, IfLike i, Scope* scope) {
+    void buildSymTable(SymbolTable &sm, Let l) {
+        sm.add(l.m_identifier.m_name);
+        buildSymTable(sm, *l.m_body);
+    }
+
+    void buildSymTable(SymbolTable& sm, Def d) {
+        sm.add(d.m_identifier.m_name);
+        sm.func_ptrs.insert({sm.get(d.m_identifier.m_name), std::make_shared<Def>(d)});
+        for (auto a: d.m_operands) {
+            a->match([&](Identifier i) {
+                sm.add(i.m_name);
+            });
+            buildSymTable(sm, *a);
+        }
+        for (auto& a: d.m_body) {
+            buildSymTable(sm, *a);
+        }
+    }
+
+
+    void buildSymTable(SymbolTable& sm, Expression e) {
+        e.match( [&]( If v ) {
+                     buildSymTable(sm, *v.m_condition);
+                     for (auto& a: v.m_body) {
+                         buildSymTable(sm, *a);
+                     }
+                 },
+                 [&]( Call v ) {
+                     sm.add(v.m_identifier.m_name);
+                     for (auto& a: v.m_operands) {
+                         buildSymTable(sm, *a);
+                     }
+                 },
+                 [&]( App v ) {
+                     for (auto& b: v.m_operands) {
+                         buildSymTable(sm, *b);
+                     }
+                 },
+                 [&]( While v ) {
+                     buildSymTable(sm, *v.m_condition);
+                     for (auto& a: v.m_body) {
+                         buildSymTable(sm, *a);
+                     }
+                 },
+                 [&]( Identifier i) {
+                     sm.add(i.m_name);
+                 },
+                 [&]( Let v ) {
+                     buildSymTable(sm, v);
+                 }
+        );
+
+    }
+
+    void buildScope(SymbolTable& sm, IfLike i, Scope* scope) {
         buildScope(sm, *i.m_condition, scope);
         i.m_scope.setparent(scope);
-		for (auto& a: i.m_body) {
-			buildScope(sm, *a, &i.m_scope);
-		}
+        for (auto& a: i.m_body) {
+            buildScope(sm, *a, &i.m_scope);
+        }
         scope->save(i.m_scope);
-	}
+    }
 
-	void buildScope(SymbolTable &sm, Let l, Scope* scope) {
-		sm.add(l.m_identifier.m_name);
+    void buildScope(SymbolTable &sm, Let l, Scope* scope) {
         scope->define(sm.get(l.m_identifier.m_name));
-		buildScope(sm, *l.m_body, scope);
-	}
+        buildScope(sm, *l.m_body, scope);
+    }
 
-	void buildScope(SymbolTable& sm, Def d, Scope* scope) {
-		sm.add(d.m_identifier.m_name);
-
+    void buildScope(SymbolTable& sm, Def d, Scope* scope) {
         scope->define(sm.get(d.m_identifier.m_name));
         d.m_scope.setparent(scope);
 
-		for (auto a: d.m_operands) {
+        for (auto a: d.m_operands) {
             a->match([&](Identifier i) {
-                sm.add(i.m_name);
                 d.m_scope.define(sm.get(i.m_name));
             });
-			buildScope(sm, *a, &d.m_scope);
-		}
+            buildScope(sm, *a, &d.m_scope);
+        }
 
-		for (auto& a: d.m_body) {
-			buildScope(sm, *a, &d.m_scope);
-		}
-
+        for (auto& a: d.m_body) {
+            buildScope(sm, *a, &d.m_scope);
+        }
         scope->save(d.m_scope);
-	}
-
-	void buildScope(SymbolTable& sm, Toplevel& tl) {
-        for (auto& g : tl.m_globals) {
-		g.match(
-			[&](Def d) {buildSymTable(sm, d);},
-			[&](Let l) {buildSymTable(sm, l);}
-		);
-	}
-	
-
-	for (auto& g : tl.m_globals) {
-			g.match(
-				[&] (Def d) {buildScope(sm, d, &tl.m_scope);},
-				[&] (Let l) {buildScope(sm, l, &tl.m_scope);}
-			);
-		}
-	}
+    }
 
 	void buildScope(SymbolTable& sm, Expression e, Scope* scope)
 	{
 		e.match( [&]( If v ) {
-					 buildScope(sm, v, scope);
+                     buildScope(sm, v, scope);
 				 },
 				 [&]( Call v ) {
-					sm.add(v.m_identifier.m_name);
-				        scope->check(sm.get(v.m_identifier.m_name));
-					for (auto& a: v.m_operands) {
-						buildScope(sm, *a, scope);
-					}
+                     scope->check(sm.get(v.m_identifier.m_name));
+                     for (auto& a: v.m_operands) {
+                         buildScope(sm, *a, scope);
+                     }
 				 },
 				 [&]( App v ) {
 					for (auto& b: v.m_operands) {
@@ -188,7 +194,6 @@ namespace {
 					 buildScope(sm, v, scope);
 				 },
 				 [&]( Identifier i) {
-                          		sm.add(i.m_name);
         				scope->check(sm.get(i.m_name));
 				 },
 				 [&]( Let v ) {
@@ -196,6 +201,29 @@ namespace {
 				 }
 		);
 	}
+
+
+    void buildScope(SymbolTable& sm, Toplevel& tl) {
+        for (auto& g : tl.m_globals) {
+            g.match(
+                    [&](Def d) {buildSymTable(sm, d);},
+                    [&](Let l) {buildSymTable(sm, l);}
+            );
+        }
+
+        tl.m_scope.define(0);
+        for (auto& g : tl.m_globals) {
+            g.match(
+                    [&] (Def d) {buildScope(sm, d, &tl.m_scope);},
+                    [&] (Let l) {buildScope(sm, l, &tl.m_scope);}
+            );
+        }
+
+        if (sm.get("main") == -1) {
+            std::cerr << "Main not defined" << std::endl;
+            throw ScopeError("Main not found");
+        }
+    }
 
 }
 
@@ -281,3 +309,179 @@ std::ostream &operator<<( std::ostream &o, Toplevel t ) {
 
 }
 
+namespace {
+    using Value = Union<int, std::string>;
+    using SptrVal = std::shared_ptr<Value>;
+    using ValMap = std::unordered_map<int, SptrVal>;
+
+
+    std::ostream& operator<<(std::ostream& os, Value val) {
+        val.match(
+                [&] (int i) {os << "* int " << i << std::endl;},
+                [&] (std::string i) {os << "* int " << i << std::endl;}
+        );
+        return os;
+    }
+
+    Value eval(SymbolTable& sm, Expression e, std::unordered_map<int, Value>& vals);
+
+    //Evaluates inside of IfLike only if condition is met
+    Value eval(SymbolTable& sm, IfLike i, ValMap& vals) {
+        auto x = eval(sm, *i.m_condition, vals);
+        if( x != 0) {
+            for (auto& a: i.m_body) {
+                eval(sm, *a, vals);
+            }
+        }
+    }
+
+    //Sets new variable in ValMap
+    Value eval(SymbolTable &sm, Let l, ValMap& vals) {
+        Value x = eval(sm, *l.m_body, vals);
+        auto iter = vals.find(sm.get(l.m_identifier.m_name));
+        if (iter == vals.end()) {
+            vals.insert({sm.get(l.m_identifier.m_name), x});
+        } else {
+            iter->second = x;
+        }
+        x.match(
+                [&](int i) {std::cout <<"let" << i << std::endl;}
+        );
+        return x;
+    }
+
+    //Simply evaluates the body, arguments are already passed in
+    Value eval(SymbolTable& sm, Def d, ValMap& vals) {
+        Value x;
+        for (auto& a: d.m_body) {
+            x = eval(sm, *a, vals);
+        }
+        return x;
+    }
+
+    //Setup new scope and returns inside of function
+    Value eval(SymbolTable& sm, Call c, ValMap& vals) {
+        Def* next = sm.func_ptrs.find(sm.get(c.m_identifier.m_name))->second.get();
+        if (next->m_operands.size() != c.m_operands.size()) {
+            throw std::runtime_error("Calling " + next->m_identifier.m_name + "with wrong number of arguments");
+        }
+        ValMap newVal;
+        for (int i = 0; i < c.m_operands.size(); ++i) {
+            next->m_operands[i]->match(
+                    [&](Identifier n) {
+                        newVal.insert({sm.get(n.m_name), eval(sm, *c.m_operands[i], vals)});
+                    }
+            );
+        }
+        return eval(sm, *next, newVal);
+    }
+
+
+
+    Value eval(SymbolTable& sm, App a, ValMap& vals) {
+        char o = a.m_operator;
+
+        if (o == '~') {
+            Value x = 0;
+            a.m_operands[0]->match(
+                    [&](Identifier i) {
+                        auto hndl = vals.find(sm.get(i.m_name));
+                        x = eval(sm, *a.m_operands[1], vals);
+                        std::cerr << x;
+                        hndl->second = x;
+                    }
+            );
+        }
+        auto rhs = eval(sm, *a.m_operands[0], vals);
+        auto lhs = eval(sm, *a.m_operands[1], vals);
+
+        Value x;
+
+        rhs.match(
+                [&](int i) {
+                    lhs.match(
+                            [&](int j) {
+                                if (o == '+') {
+                                    x = i + j;
+                                } else if (o == '-') {
+                                    x = i - j;
+                                } else if (o == '*') {
+                                    x = i * j;
+                                } else if (o == '/') {
+                                    x = i / j;
+                                }
+                            }
+                    );
+                }
+        );
+
+        if (o == '=') {
+            if (rhs == lhs) {
+                return 1;
+            }
+        } else if (o == '!') {
+            if (rhs == lhs) {
+                return 0;
+            }
+        }
+        return x;
+    }
+
+    //Dispatch function for every type of node
+    Value eval(SymbolTable& sm, Expression e, ValMap& vals)
+    {
+        Value x;
+        e.match( [&]( If v ) {
+                     x = eval(sm, v, vals);
+                 },
+                 [&]( Call v ) {
+                     sm.call_stack.push(&e);
+                    x =  eval(sm, v, vals);
+                 },
+                 [&]( App v ) {
+                    x = eval(sm, v, vals);
+                 },
+                 [&]( While v ) {
+                     x = eval(sm, v, vals);
+                 },
+                 [&]( Identifier i) {
+                     x = vals.find(sm.get(i.m_name))->second;
+                     std::cout << i.m_name;
+                 },
+                 [&]( Let v ) {
+                     x = eval(sm, v, vals);
+                 },
+                 [&] (Constant c) {
+                     x = c;
+                     std::cout << "c ";
+                 }
+        );
+        x.match(
+                [&](int i) {
+                    std::cout << "int exp: "<< i << std::endl;
+                },
+                [&](std::string i) {
+                    std::cout << "str exp: "<< i << std::endl;
+                }
+        );
+        return x;
+    }
+
+
+    Value eval(SymbolTable& sm, Toplevel& tl) {
+        Def* a = sm.func_ptrs.find(sm.get("main"))->second.get();
+        std::cout << "Yolo" << std::endl;
+        std::cerr << a->m_identifier << std::endl;
+        ValMap vals;
+        for (auto b : a->m_operands) {
+            int index = 0;
+            b->match(
+                    [&](Identifier i) {index = sm.get(i.m_name);}
+            );
+            vals.insert({index, std::make_shared<Value>()});
+        }
+        std::cerr << "Res" << eval(sm, Def(*a), vals);
+        return *vals.find(sm.get("a"))->second.get();
+    }
+
+}
