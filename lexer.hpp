@@ -10,7 +10,7 @@
 struct Token {
 	enum class Cat {
 		ParenOpen, ParenClose, Plus, Minus, Times, Div, Equals, LitString, LitNumber,
-		Identifier, If, Else, Endif, While, Error, Eof, Def, Let, Not, Assign
+		Identifier, If, Else, Endif, While, Error, Eof, Def, Let, Not, Assign, Struct, Access
 	} m_cat;
 
 	std::string m_text;
@@ -38,6 +38,7 @@ struct Lexer {
 		{'=', Token::Cat::Equals},
 		{'!', Token::Cat::Not},
 		{'~', Token::Cat::Assign},
+		{'.', Token::Cat::Access},
 	};
 	
 	std::map <std::string, Token::Cat> m_keywords = {
@@ -47,6 +48,7 @@ struct Lexer {
 		{"while", Token::Cat::While},
 		{"def", Token::Cat::Def},
 		{"let", Token::Cat::Let},
+		{"struct", Token::Cat::Struct},
 	};
 
 	std::ifstream m_input;

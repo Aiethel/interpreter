@@ -22,7 +22,7 @@ static inline std::ostream& operator<<(std::ostream& o, ScopeError& se) {
 
 struct SymbolTable {
 	std::map<std::string, int> m_data = {{"return" , 0}};
-    std::map<int, std::shared_ptr<Def>> func_ptrs;
+    std::map<int, Def> func_ptrs;
     std::stack<Expression*> call_stack;
 
 	void add(const std::string& str) {
@@ -65,13 +65,10 @@ struct Scope {
     Scope(const Scope& scope) = default;
 
     void check(int n) {
-        Scope* hndl = this;
-        while (hndl) {
-            if (hndl->m_identifiers.find(n) != hndl->m_identifiers.end()) {
-                return;
-            }
-            hndl = hndl->m_parent;
-        }
+		if (m_identifiers.find(n) != m_identifiers.end()) {
+			return;
+		}
+		if (m_parent) return m_parent->check(n);
         fail (ScopeError("Variable not define yet used " + std::to_string(n)));
     }
 

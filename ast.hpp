@@ -4,7 +4,9 @@
 #include <vector>
 #include <unordered_map>
 #include <stack>
-#include "bricks/brick-types"
+
+#include <brick-types>
+
 #include "scope.hpp"
 
 using brick::types::Union;
@@ -96,7 +98,7 @@ namespace {
 
     void buildSymTable(SymbolTable& sm, Def d) {
         sm.add(d.m_identifier.m_name);
-        sm.func_ptrs.insert({sm.get(d.m_identifier.m_name), std::make_shared<Def>(d)});
+        sm.func_ptrs.insert({sm.get(d.m_identifier.m_name), Def(d)});
         for (auto a: d.m_operands) {
             a->match([&](Identifier i) {
                 sm.add(i.m_name);
@@ -373,7 +375,7 @@ namespace {
 
     //Setup new scope and returns inside of function
     Value eval(SymbolTable& sm, Call c, ValMap& vals) {
-        Def* next = sm.func_ptrs.find(sm.get(c.m_identifier.m_name))->second.get();
+        Def* next = &sm.func_ptrs.find(sm.get(c.m_identifier.m_name))->second;
         if (next->m_operands.size() != c.m_operands.size()) {
             throw std::runtime_error("Calling " + next->m_identifier.m_name + "with wrong number of arguments");
         }
@@ -480,7 +482,7 @@ namespace {
 
 
     Value eval(SymbolTable& sm, Toplevel& tl) {
-        Def* a = sm.func_ptrs.find(sm.get("main"))->second.get();
+        Def* a = &sm.func_ptrs.find(sm.get("main"))->second;
         ValMap vals;
         for (auto b : a->m_operands) {
             int index = 0;
@@ -489,7 +491,7 @@ namespace {
             );
             vals.insert({index, std::make_shared<Value>()});
         }
-        eval(sm, Def(*a), vals);
+        eval(sm, *a, vals);
         return *vals.find(sm.get("a"))->second.get();
     }
 
