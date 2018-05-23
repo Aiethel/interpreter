@@ -1,0 +1,3 @@
+# Interpreter of simple Lisp-like language
+
+Created as a project for class pb173. It can interpret simple lisp-like programs (examples found in test directory). Implementation is as simple as it can be, e.g there's no dynamic memory, type checking, ...

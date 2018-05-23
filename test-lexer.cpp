@@ -216,16 +216,11 @@ TEST_CASE("SymbolTable") {
 
 TEST_CASE("Output") {
     Interpreter interpreter("test/data.txt");
-    //std::cout << interpreter.toplevel;
-    //std::cout << interpreter.symTable;
-    //std::cout << "****" << std::endl << interpreter.toplevel.m_scope << std::endl;
 }
 
 
 TEST_CASE("Factorial") {
     Interpreter interpreter("test/fact.txt");
-    //std::cout << interpreter.toplevel;
-    //std::cout << interpreter.symTable;
     CHECK(interpreter.symTable.func_ptrs.size() == 2);
     int a = interpreter.run();
     CHECK(a == 5);
@@ -235,9 +230,6 @@ TEST_CASE("Factorial") {
 
 TEST_CASE("Something that really counts factorial") {
         Interpreter interpreter("test/RealFact.txt");
-        //std::cout << "RealFact.txt" << std::endl;
-        //std::cout << interpreter.toplevel;
-        //std::cout << interpreter.symTable;
         int a = interpreter.run();
         CHECK(a == 120);
 }
